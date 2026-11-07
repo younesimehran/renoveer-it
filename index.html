@@ -1390,17 +1390,50 @@ function validateField(id) {
   if (group) group.classList.toggle('has-error', !ok);
   return ok;
 }
+const WEB3FORMS_KEY = '7d915bef-a6d7-4fb9-90c1-a747d49534b8';
 form.addEventListener('submit', e => {
   e.preventDefault();
   let valid = true;
   Object.keys(validators).forEach(id => { if (!validateField(id)) valid = false; });
   const status = document.getElementById('formStatus');
   if (valid) {
-    status.textContent = 'Bedankt! Uw aanvraag is verzonden. We nemen binnen 24 uur contact met u op.';
-    status.classList.add('is-success');
-    form.reset();
-    selectedFiles = [];
-    renderPreviews();
+    const btn = document.getElementById('formSubmitBtn');
+    const btnText = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'Bezig met verzenden…';
+    const data = {
+      access_key: WEB3FORMS_KEY,
+      subject: 'Nieuwe offerteaanvraag via renoveer-it.be',
+      from_name: 'Website Renoveer It',
+      botcheck: ''
+    };
+    new FormData(form).forEach((v, k) => { if (typeof v === 'string') data[k] = v; });
+    if (selectedFiles.length) data.bijlagen = selectedFiles.length + ' bestand(en) gekozen (niet meegestuurd, vraag de klant om ze te mailen)';
+    fetch('https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(data)
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          status.textContent = 'Bedankt! Uw aanvraag is verzonden. We nemen binnen 24 uur contact met u op.';
+          status.classList.add('is-success');
+          status.removeAttribute('style');
+          form.reset();
+          selectedFiles = [];
+          renderPreviews();
+        } else { throw new Error(res.message || 'Verzenden mislukt'); }
+      })
+      .catch(() => {
+        status.textContent = 'Er ging iets mis bij het verzenden. Probeer het later opnieuw of mail ons via info@renoveer-it.be.';
+        status.classList.remove('is-success');
+        status.style.display = 'block';
+        status.style.background = 'rgba(181,102,91,.14)';
+        status.style.color = '#d98b7f';
+        status.style.border = '1px solid rgba(181,102,91,.3)';
+      })
+      .finally(() => { btn.disabled = false; btn.innerHTML = btnText; });
   } else {
     status.classList.remove('is-success');
     const firstError = form.querySelector('.has-error');
